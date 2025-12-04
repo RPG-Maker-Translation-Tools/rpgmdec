@@ -356,8 +356,18 @@ impl Application {
                 .set_value(tr!("-Select engine for encryption-"));
         }
 
+        if matches!(self.state, State::DecryptArchive | State::DecryptAsset) {
+            self.process_button.set_label(tr!("Decrypt"));
+        } else if matches!(
+            self.state,
+            State::EncryptArchive | State::EncryptAsset
+        ) {
+            self.process_button.set_label(tr!("Encrypt"));
+        }
+
         self.menu_bar.clear();
         self.add_menubar_entries();
+        self.window.redraw();
     }
 
     fn run() {
