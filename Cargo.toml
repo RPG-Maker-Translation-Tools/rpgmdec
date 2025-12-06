@@ -1,6 +1,6 @@
 [package]
 name = "rpgmdec"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 
 [dependencies]
@@ -20,3 +20,6 @@ sys-locale = "0.3.2"
 time = "0.3.44"
 walkdir = "2.5.0"
 webbrowser = { version = "1.0.6", features = ["disable-wsl", "hardened"] }
+
+[build-dependencies]
+embed-resource = "3.0.6"

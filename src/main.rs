@@ -82,6 +82,9 @@ const XP_ENGINE_LABEL: &str = "XP";
 const VX_ENGINE_LABEL: &str = "VX";
 const VXACE_ENGINE_LABEL: &str = "VX Ace";
 
+const LOGO_32PX: &[u8] = include_bytes!("../icons/32px.rgba");
+const LOGO_256PX: &[u8] = include_bytes!("../icons/256px.rgba");
+
 struct AudioPlayer {
     stream: Option<cpal::Stream>,
     state: Arc<AtomicU8>,
@@ -391,6 +394,9 @@ impl Application {
         let mut window = Window::default()
             .with_size(WINDOW_WIDTH, WINDOW_HEIGHT)
             .with_label("RPGMDec");
+        window.set_icon(unsafe {
+            RgbImage::from_data(LOGO_32PX, 32, 32, ColorDepth::Rgba8).ok()
+        });
         window.make_resizable(true);
 
         let mut window_layout = Flex::default_fill().column();
@@ -744,14 +750,18 @@ impl Application {
         i += 1;
 
         self.menu_bar.add(tr!(MENU_BAR_ITEMS[i]), Shortcut::None, MenuFlag::Normal, |_| {
-            let mut about_window = Window::default().with_label(tr!("About RPGMDec")).with_size(600, 200);
+            let mut about_window = Window::default().with_label(tr!("About RPGMDec")).with_size(600, 320);
 
-            let layout = Flex::default_fill().column();
+            let mut layout = Flex::default_fill().column();
+
+            let mut image_frame = Frame::default();
+            image_frame.set_image(unsafe {RgbImage::from_data(LOGO_256PX, 256, 256, ColorDepth::Rgba8).ok()});
 
             let _frame = Frame::default().with_label(&tr!("RPGMDec {}\nLicensed under WTFPL\nRepository: https://github.com/rpg-maker-translation-tools/rpgmdec\nFLTK {}").replacen("{}", env!("CARGO_PKG_VERSION"), 1).replacen("{}", &version_str(), 1));
 
             let mut ok_button = Button::default().with_label(tr!("OK"));
 
+            layout.fixed(&ok_button, 32);
             layout.end();
             about_window.end();
             about_window.make_modal(true);
