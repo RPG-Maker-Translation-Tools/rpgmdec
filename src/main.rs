@@ -50,14 +50,15 @@ use std::{
     ffi::OsStr,
     fs::{create_dir_all, exists, metadata, read, write},
     io::Cursor,
-    ops::ControlFlow,
     path::{Path, PathBuf},
+    ptr::{from_mut as ptr_from_mut, from_ref as ptr_from_ref},
     sync::{
         Arc,
         atomic::{AtomicU8, AtomicU64, Ordering},
     },
     time::Duration,
 };
+use strum_macros::EnumIs;
 use symphonia::core::{
     audio::SampleBuffer,
     codecs::DecoderOptions,
@@ -130,21 +131,35 @@ where
 
     fn tr_id(&self) -> &'static str {
         WIDGET_MAP.with_borrow(|m| unsafe {
-            &*std::ptr::from_ref::<str>(
+            &*ptr_from_ref::<str>(
                 m.get(&(self.as_widget_ptr() as usize)).unwrap_or(&""),
             )
         })
     }
 }
 
+#[derive(EnumIs)]
 enum DisplayMode {
     Image(SharedImage),
     Audio((&'static str, &'static Option<FileType>)),
     Message(String),
 }
 
-// Quick & dirty translation scratch, only supports two languages.
-// If more languages is about to be added to the app, that needs to be cleanly rewritten.
+#[derive(EnumIs, Clone, Copy, PartialEq)]
+enum State {
+    None,
+    EncryptAsset,
+    DecryptAsset,
+    EncryptArchive,
+    DecryptArchive,
+}
+
+#[derive(EnumIs)]
+enum Language {
+    English,
+    Russian,
+}
+
 static mut TRANSLATION: Map<&'static str, &'static str> = phf_map! {};
 
 const fn init_ru() {
@@ -204,6 +219,7 @@ const fn init_ru() {
             "Aborting encryption: {}" => "Прерываем зашифровку: {}",
             "Decrypting file {} failed: {}" => "Расшифровка файла {} не удалась: {}",
             "No eligible files were found." => "Подходящие файлы не найдены.",
+            "Wasn't able to determine processing mode by the first passed file." => "Не удалось определить режим обработки по первому полученному файлу",
             "Font parsing failed: {}" => "Парсинг шрифта не удался: {}",
             "Probing format failed: {}" => "Проверка формата не удалась: {}",
             "Getting default output device failed." => "Не удалось получить стандартное устройство вывода.",
@@ -233,20 +249,6 @@ const MENU_BAR_ITEMS: &[&str] = &[
     "&Help/Help\t",
     "&Help/About\t",
 ];
-
-#[derive(Clone, Copy, PartialEq)]
-enum State {
-    None,
-    EncryptAsset,
-    DecryptAsset,
-    EncryptArchive,
-    DecryptArchive,
-}
-
-enum Language {
-    English,
-    Russian,
-}
 
 struct Application {
     decrypted_archive_entries: Vec<ArchiveEntry>,
@@ -297,7 +299,7 @@ struct Application {
 }
 
 impl Application {
-    fn retranslate_widgets(root: &Group) {
+    fn retranslate_widgets(&self, root: &Group) {
         let mut stack = Vec::new();
         stack.push(root.clone());
 
@@ -322,6 +324,12 @@ impl Application {
                     let tr_id = widget.tr_id();
 
                     if tr_id.is_empty() {
+                        continue;
+                    }
+
+                    if self.current_image.is_some()
+                        && widget == self.image_frame.as_base_widget()
+                    {
                         continue;
                     }
 
@@ -350,7 +358,7 @@ impl Application {
             init_en();
         }
 
-        Self::retranslate_widgets(&self.window.as_group().unwrap());
+        self.retranslate_widgets(&self.window.as_group().unwrap());
 
         let engine_index = self.output_engine_select.menu_button().value();
 
@@ -656,7 +664,7 @@ impl Application {
 
     fn remove_button_cb(&mut self, _this: &mut Button) {
         for item in self.file_list.selected_items().into_iter().rev() {
-            if self.state == State::DecryptArchive {
+            if self.state.is_decrypt_archive() {
                 self.decrypted_archive_entries.remove(item as usize - 1);
             } else {
                 self.file_list_map.shift_remove_index(item as usize - 1);
@@ -670,7 +678,7 @@ impl Application {
     fn add_menubar_entries(&mut self) {
         let mut i = 0;
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.menu_bar.add(tr!(MENU_BAR_ITEMS[i]), Shortcut::Ctrl | 'o', MenuFlag::Normal, move |_| {
             let Some(file) = file_chooser(tr!("Select File"), tr!("Encrypted Assets/Archives (*.{rpgmvp,rpgmvo,rpgmvm,png_,ogg_,m4a_,rgssad,rgss2a,rgss3a})\t"), dirs::home_dir().unwrap().join(""), true) else {
                 return;
@@ -680,7 +688,7 @@ impl Application {
         });
         i += 1;
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.menu_bar.add(
             tr!(MENU_BAR_ITEMS[i]),
             Shortcut::Ctrl | Shortcut::Shift | 'o',
@@ -718,7 +726,7 @@ impl Application {
         );
         i += 1;
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.menu_bar.add(
             tr!(MENU_BAR_ITEMS[i]),
             Shortcut::None,
@@ -729,7 +737,7 @@ impl Application {
         );
         i += 1;
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.menu_bar.add(
             tr!(MENU_BAR_ITEMS[i]),
             Shortcut::None,
@@ -740,7 +748,7 @@ impl Application {
         );
         i += 1;
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.menu_bar.add(tr!(MENU_BAR_ITEMS[i]), Shortcut::None, MenuFlag::Normal, move |_| {
             let _ = match mut_self.language {
                 Language::Russian => webbrowser::open("https://github.com/rpg-maker-translation-tools/rpgmdec/tree/master/docs/help-ru.md"),
@@ -776,15 +784,15 @@ impl Application {
     fn set_callbacks(&mut self) {
         self.add_menubar_entries();
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.clear_button
             .set_callback(|this| mut_self.clear_button_cb(this));
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.remove_button
             .set_callback(|this| mut_self.remove_button_cb(this));
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.process_button.set_callback(move |this| {
             let date = OffsetDateTime::now_utc();
             let output_dir = Path::new(&mut_self.output_dir).join(format!(
@@ -820,59 +828,59 @@ impl Application {
             }
         });
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.window
             .handle(move |_, event| mut_self.window_handle(event));
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.file_list
             .set_callback(move |this| mut_self.file_list_cb(this));
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.play_button
             .set_callback(move |this| mut_self.play_button_cb(this));
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.pause_button
             .set_callback(move |this| mut_self.pause_button_cb(this));
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.stop_button
             .set_callback(move |this| mut_self.stop_button_cb(this));
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.select_output_dir_button.set_callback(move |this| {
             mut_self.select_output_dir_button_cb(this);
         });
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.progress_slider.handle(move |this, event| {
             mut_self.progress_slider_handle(this, event)
         });
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.select_all_button
             .set_callback(move |this| mut_self.select_all_button_cb(this));
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.deselect_all_button
             .set_callback(move |this| mut_self.deselect_all_button_cb(this));
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.output_dir_input.handle(move |this, event| {
             mut_self.output_dir_input_handle(this, event)
         });
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.image_frame
             .draw(move |this| mut_self.image_frame_draw(this));
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         self.image_frame.handle(move |this, event| {
             mut_self.image_frame_handle(this, event)
         });
 
-        let mut_self = unsafe { &mut *std::ptr::from_mut::<Self>(self) };
+        let mut_self = unsafe { &mut *ptr_from_mut::<Self>(self) };
         app::add_idle3(move |handle| mut_self.idle_cb(handle));
     }
 
@@ -1400,77 +1408,24 @@ impl Application {
         }
     }
 
-    fn parse_asset(
-        &mut self,
-        file_path: &Path,
-        required_component: &mut Option<String>,
-    ) -> ControlFlow<String> {
+    fn parse_asset(&mut self, file_path: &Path) -> Option<FileType> {
         let extension = file_path
             .extension()
             .and_then(OsStr::to_str)
-            .map(str::to_ascii_lowercase);
+            .map(str::to_ascii_lowercase)?;
 
-        let Some(ext) = extension else {
-            return ControlFlow::Continue(());
-        };
+        let ext = extension.as_str();
 
-        let ext = ext.as_str();
-
-        let is_allowed_extension = ENCRYPTED_ASSET_EXTS.contains(&ext)
+        let is_allowed = ENCRYPTED_ASSET_EXTS.contains(&ext)
             || DECRYPTED_ASSETS_EXTS.contains(&ext)
             || matches!(ext, "ttf" | "otf" | "rxdata" | "rvdata" | "rvdata2");
 
-        let entry_already_exists =
-            self.file_list_map.contains_key(file_path.to_str().unwrap());
-
-        if !is_allowed_extension || entry_already_exists {
-            return ControlFlow::Continue(());
+        if !is_allowed {
+            return None;
         }
 
-        let mut found_component: Option<&str> = None;
-
-        if DECRYPTED_ASSETS_EXTS.contains(&ext) {
-            let mut path_components = file_path.components().rev();
-
-            if path_components.any(|c| c.as_os_str() == "www") {
-                found_component = Some("www");
-            } else {
-                for candidate in ["Audio", "Graphics", "Data", "Fonts"] {
-                    let mut path_components = file_path.components().rev();
-
-                    if path_components.any(|c| c.as_os_str() == candidate) {
-                        found_component = Some(candidate);
-                        break;
-                    }
-                }
-            }
-
-            if found_component.is_none() {
-                return ControlFlow::Break(tr!("Unable to determine the type of the passed assets from the passed path {}. If you want to encrypt an archive, your assets should be arranged in `Audio`, `Graphics`, `Data` or/and `Fonts` directories. If you want to encrypt assets, the path the the asset should contain `www` directory.").replacen("{}", &file_path.display().to_string(), 1));
-            }
-
-            if let Some(component) = required_component {
-                if component == "www" {
-                    if component != found_component.unwrap() {
-                        return ControlFlow::Break(tr!("Component mismatch when parsing files. Detected `www` directory for asset encryption, but it's missing in the path {}.").replacen("{}", &file_path.display().to_string(), 1));
-                    }
-                } else {
-                    let mut is_required_component = false;
-
-                    for candidate in ["Audio", "Graphics", "Data", "Fonts"] {
-                        if component == candidate {
-                            is_required_component = true;
-                        }
-                    }
-
-                    if !is_required_component {
-                        return ControlFlow::Break(tr!("Component mismatch when parsing files. Detected Audio/Graphics/Data/Fonts directories for archive encryption, but it's missing in the path {}.").replacen("{}", &file_path.display().to_string(), 1));
-                    }
-                }
-            } else {
-                *required_component =
-                    Some(found_component.unwrap().to_string());
-            }
+        if self.file_list_map.contains_key(file_path.to_str().unwrap()) {
+            return None;
         }
 
         let filename = file_path.file_name().and_then(OsStr::to_str).unwrap();
@@ -1480,15 +1435,101 @@ impl Application {
         self.file_list_map
             .insert(file_path.to_string_lossy().to_string(), file_type);
 
-        ControlFlow::Continue(())
+        file_type
     }
 
-    fn parse_assets(&mut self, paths: &str) {
+    fn detect_state_from_path(path: &Path) -> Option<State> {
+        let extension = path
+            .extension()
+            .and_then(OsStr::to_str)
+            .map(str::to_ascii_lowercase)?;
+
+        let ext = extension.as_str();
+
+        if matches!(ext, XP_RGSSAD_EXT | VX_RGSS2A_EXT | VXACE_RGSS3A_EXT) {
+            return Some(State::DecryptArchive);
+        }
+
+        if ENCRYPTED_ASSET_EXTS.contains(&ext) {
+            return Some(State::DecryptAsset);
+        }
+
+        if DECRYPTED_ASSETS_EXTS.contains(&ext)
+            || matches!(ext, "ttf" | "otf" | "rxdata" | "rvdata" | "rvdata2")
+        {
+            let mut path_components = path.components().rev();
+
+            if path_components.any(|c| c.as_os_str() == "www") {
+                return Some(State::EncryptAsset);
+            }
+
+            for candidate in ["Audio", "Graphics", "Data", "Fonts"] {
+                let mut path_components = path.components().rev();
+                if path_components.any(|c| c.as_os_str() == candidate) {
+                    return Some(State::EncryptArchive);
+                }
+            }
+        }
+
+        None
+    }
+
+    fn should_include_file(path: &Path, target_state: State) -> bool {
+        let Some(extension) = path
+            .extension()
+            .and_then(OsStr::to_str)
+            .map(str::to_ascii_lowercase)
+        else {
+            return false;
+        };
+
+        let ext = extension.as_str();
+
+        match target_state {
+            State::DecryptArchive => {
+                matches!(ext, XP_RGSSAD_EXT | VX_RGSS2A_EXT | VXACE_RGSS3A_EXT)
+            }
+            State::DecryptAsset => ENCRYPTED_ASSET_EXTS.contains(&ext),
+            State::EncryptAsset => {
+                let is_valid_ext = DECRYPTED_ASSETS_EXTS.contains(&ext)
+                    || matches!(
+                        ext,
+                        "ttf" | "otf" | "rxdata" | "rvdata" | "rvdata2"
+                    );
+
+                if !is_valid_ext {
+                    return false;
+                }
+
+                path.components().any(|c| c.as_os_str() == "www")
+            }
+            State::EncryptArchive => {
+                let is_valid_ext = DECRYPTED_ASSETS_EXTS.contains(&ext)
+                    || matches!(
+                        ext,
+                        "ttf" | "otf" | "rxdata" | "rvdata" | "rvdata2"
+                    );
+
+                if !is_valid_ext {
+                    return false;
+                }
+
+                ["Audio", "Graphics", "Data", "Fonts"].iter().any(
+                    |&candidate| {
+                        path.components().any(|c| c.as_os_str() == candidate)
+                    },
+                )
+            }
+            State::None => false,
+        }
+    }
+
+    fn parse_files(&mut self, paths: &str) {
         self.clear();
 
-        let mut required_component: Option<String> = None;
+        let mut detected_state: Option<State> = None;
 
-        for path_str in paths.lines() {
+        'outer: for path_str in paths.lines() {
             let path = Path::new(path_str);
 
             if path.is_dir() {
@@ -1499,83 +1540,88 @@ impl Application {
                 {
                     let file_path = entry.path();
 
-                    if let ControlFlow::Break(err) =
-                        self.parse_asset(file_path, &mut required_component)
+                    if detected_state.is_none() {
+                        let Some(state) =
+                            Self::detect_state_from_path(file_path)
+                        else {
+                            break 'outer;
+                        };
+
+                        detected_state = Some(state);
+                        self.state = state;
+                    }
+
+                    if let Some(target_state) = detected_state
+                        && Self::should_include_file(file_path, target_state)
                     {
-                        alert_default(&err);
-                        self.clear();
-                        return;
+                        if target_state.is_decrypt_archive() {
+                            self.parse_archive(file_path);
+                            break;
+                        }
+
+                        self.parse_asset(file_path);
                     }
                 }
+            } else {
+                if detected_state.is_none() {
+                    let Some(state) = Self::detect_state_from_path(path) else {
+                        break;
+                    };
 
-                continue;
-            }
+                    detected_state = Some(state);
+                    self.state = state;
+                }
 
-            if let ControlFlow::Break(err) =
-                self.parse_asset(path, &mut required_component)
-            {
-                alert_default(&err);
-                self.clear();
-                return;
+                if let Some(target_state) = detected_state
+                    && Self::should_include_file(path, target_state)
+                {
+                    if target_state.is_decrypt_archive() {
+                        self.parse_archive(path);
+                        break;
+                    }
+
+                    self.parse_asset(path);
+                }
             }
+        }
+
+        if detected_state.is_none() {
+            message_default(tr!(
+                "Wasn't able to determine processing mode by the first passed file."
+            ));
+            return;
         }
 
         if self.file_list.size() == 0 {
             message_default(tr!("No eligible files were found."));
         }
 
-        if let Some(required_component) = required_component {
-            self.output_engine_select.clear();
+        match self.state {
+            State::DecryptArchive | State::DecryptAsset => {
+                self.process_button.set_label(tr!("Decrypt"));
+            }
 
-            if required_component == "www" {
-                self.state = State::EncryptAsset;
-
+            State::EncryptAsset => {
+                self.output_engine_select.clear();
                 self.output_engine_select.add(MV_ENGINE_LABEL);
                 self.output_engine_select.add(MZ_ENGINE_LABEL);
-            } else {
-                self.state = State::EncryptArchive;
+                self.process_button.set_label(tr!("Encrypt"));
+            }
 
+            State::EncryptArchive => {
+                self.output_engine_select.clear();
                 self.output_engine_select.add(XP_ENGINE_LABEL);
                 self.output_engine_select.add(VX_ENGINE_LABEL);
                 self.output_engine_select.add(VXACE_ENGINE_LABEL);
+                self.process_button.set_label(tr!("Encrypt"));
             }
 
-            self.process_button.set_label(tr!("Encrypt"));
-        } else {
-            self.state = State::DecryptAsset;
-            self.process_button.set_label(tr!("Decrypt"));
+            State::None => {}
         }
 
         self.process_button.show();
         self.process_button.redraw();
-
         self.button_layout.layout();
-    }
-
-    fn parse_files(&mut self, paths: &str) {
-        for path_str in paths.lines() {
-            let path = Path::new(path_str);
-            if let Some(ext) = path.extension()
-                && (ext == XP_RGSSAD_EXT
-                    || ext == VX_RGSS2A_EXT
-                    || ext == VXACE_RGSS3A_EXT)
-            {
-                self.parse_archive(path);
-
-                self.state = State::DecryptArchive;
-
-                self.process_button.set_label(tr!("Decrypt"));
-
-                self.process_button.show();
-                self.process_button.redraw();
-
-                self.button_layout.layout();
-
-                return;
-            }
-        }
-
-        self.parse_assets(paths);
     }
 
     fn window_handle(&mut self, event: Event) -> bool {
@@ -1664,10 +1710,8 @@ impl Application {
                     self.file_list_map.get_index(index).unwrap();
 
                 self.update_display(DisplayMode::Audio((
-                    unsafe { &*std::ptr::from_ref::<String>(path) },
-                    unsafe {
-                        &*std::ptr::from_ref::<Option<FileType>>(file_type)
-                    },
+                    unsafe { &*ptr_from_ref::<String>(path) },
+                    unsafe { &*ptr_from_ref::<Option<FileType>>(file_type) },
                 )));
             }
             "rxdata" | "rvdata" | "rvdata2" => {
@@ -1679,7 +1723,7 @@ impl Application {
             "ttf" | "otf" => {
                 let font_data: Vec<u8>;
 
-                let font_data = if self.state == State::DecryptArchive {
+                let font_data = if self.state.is_decrypt_archive() {
                     &self.decrypted_archive_entries[index].data
                 } else {
                     let (path, _) =

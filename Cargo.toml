@@ -15,6 +15,7 @@ phf = { version = "0.13.1", features = ["macros"] }
 rayon = "1.11.0"
 rpgmad-lib = { version = "4.0.0" }
 rpgmasd = { package = "rpgm-asset-decrypter-lib", version = "3.1.0" }
+strum_macros = "0.27.2"
 symphonia = { version = "0.5.5", features = ["ogg", "isomp4", "aac", "vorbis"], default-features = false }
 sys-locale = "0.3.2"
 time = "0.3.44"
