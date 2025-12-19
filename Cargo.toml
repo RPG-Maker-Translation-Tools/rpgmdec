@@ -9,7 +9,7 @@ dirs = "6.0.0"
 fltk = { version = "1.5.22", features = ["static-msvcrt", "use-ninja", "no-gdiplus", "no-pango", "single-threaded"] }
 fltk-theme = "0.7.9"
 fontdue = { version = "0.9.3", features = ["parallel", "std"] }
-gxhash = "3.5.0"
+gxhash = { version = "3.5.0", features = ["deterministic"] }
 indexmap = "2.12.1"
 phf = { version = "0.13.1", features = ["macros"] }
 rayon = "1.11.0"
