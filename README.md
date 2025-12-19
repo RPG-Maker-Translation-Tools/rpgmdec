@@ -42,6 +42,18 @@ On top of allowing you to decrypt/encrypt assets, program also allows you to pla
 -   Audio: `ogg`, `m4a`
 -   Fonts: `ttf`, `otf`
 
+## Support
+
+[Me](https://github.com/savannstm), the maintainer of this project, is a poor college student from Eastern Europe.
+
+If you could, please consider supporting us through:
+
+-   [Ko-fi](https://ko-fi.com/savannstm)
+-   [Patreon](https://www.patreon.com/cw/savannstm)
+-   [Boosty](https://boosty.to/mcdeimos)
+
+Even if you don't, it's fine. We'll continue to do as we right now.
+
 ## License
 
 Project is licensed under WTFPL.
