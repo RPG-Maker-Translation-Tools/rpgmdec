@@ -29,7 +29,13 @@ Also, you'll need a key for asset encryption. You can input it manually if you k
 
 For archive encryption, available engines are XP, VX and VX Ace.
 
-For asset encryption, available engines are MV and MZ.
+For asset encryption, available engines are MV and MZ. Only images and audio are encrypted, as RPG Maker does it: fonts and other files of the game stay as they are and are not listed.
+
+### File name encoding
+
+File names inside archives are read as UTF-8 by default. Entries whose names are not valid UTF-8 are skipped, and a message tells you how many. Archives of older games made on Japanese systems usually need Shift-JIS: pick it in the `Encoding` menu, and the opened archive is read again.
+
+The same menu sets the encoding the names are written in when you encrypt an archive. A name that can't be written in it stops the encryption instead of being stored damaged.
 
 If you need only some specific assets, you can select only those for encryption. If you want to confirm whether you selected the right ones, you can select the file and inspect it, images, audio and fonts are supported.
 

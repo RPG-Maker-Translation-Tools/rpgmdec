@@ -2,13 +2,15 @@
 
 [README на русском](./README-ru.md)
 
-<p align="center">
-    <img src="./icons/256px.png" alt="Description" width="256"/>
-</p>
+<div style="display: flex; align-items: center; justify-content: center">
+    <img src="./icons/256px.png" alt="Description" width="128"/>
+</div>
 
 RPGMDec is a universal, lightweight (1 MB executable) and fast GUI for decrypting RPG Maker XP/VX/VXAce `.rgssad`/`.rgss2a`/`.rgss3a` archives and RPG Maker MV/MZ `.rpgmvp`/`.png_`, `.rpgmvo`/`ogg_`, `.rpgmvm`/`m4a_` assets.
 
 It also supports encryption of the aformentioned archives and assets.
+
+File names inside archives are read as UTF-8; use the `Encoding` menu (e.g. Shift-JIS) for archives of older Japanese games.
 
 `rpgmdec` is built on top of **BLAZINGLY FAST** 🔥🔥 Rust 🦀🦀🦀 libraries:
 
@@ -52,12 +54,11 @@ On top of allowing you to decrypt/encrypt assets, program also allows you to pla
 
 If you could, please consider supporting us through:
 
+- [Boosty](https://boosty.to/mcdeimos) (has lower fees)
 - [Ko-fi](https://ko-fi.com/savannstm)
-- [Patreon](https://www.patreon.com/cw/savannstm)
-- [Boosty](https://boosty.to/mcdeimos)
 
-Even if you don't, it's fine. We'll continue to do as we right now.
+Even if you don't, we will still continue working on the project anyways.
 
 ## License
 
-Project is licensed under WTFPL.
+Project is licensed under [WTFPL](https://www.wtfpl.net/).

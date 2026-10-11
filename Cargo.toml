@@ -1,36 +1,58 @@
 [package]
 name = "rpgmdec"
-version = "1.0.2"
+version = "1.1.0"
 edition = "2024"
+rust-version = "1.88.0"
+
+[features]
+system-fltk = ["fltk/system-fltk"]
+system-png = ["fltk/system-libpng"]
+system-jpeg = ["fltk/system-libjpeg"]
+system-zlib = ["fltk/system-zlib"]
+static-msvcrt = ["fltk/static-msvcrt"]
 
 [dependencies]
-cpal = "0.17.3"
-dirs = "6.0.0"
-fltk = { version = "1.5.22", features = [
-    "static-msvcrt",
-    "use-ninja",
-    "no-gdiplus",
-    "single-threaded",
-] }
+cpal = { version = "0.18.2", features = ["realtime"] }
+dirs = "7.0.0"
+encoding_rs = "0.8.42"
+fltk = { version = "1.5.23", features = ["use-ninja", "single-threaded"] }
 fltk-theme = "0.7.9"
-fontdue = { version = "0.9.3", features = ["parallel", "std"] }
+fontdue = { version = "0.9.4", features = ["parallel", "std"] }
 gxhash = { version = "3.5.0", features = ["deterministic"] }
-indexmap = "2.13.1"
-phf = { version = "0.13.1", features = ["macros"] }
-rayon = "1.11.0"
-rpgmad-lib = "4.0.0"
-rpgmasd = { package = "rpgm-asset-decrypter-lib", version = "3.2.2" }
+indexmap = "2.14.2"
+phf = { version = "0.14.0", features = ["macros"] }
+rayon = "1.12.0"
+rpgmad-lib = { version = "6.0.0" }
+rpgmasd = { package = "rpgm-asset-decrypter-lib", version = "4.0.0" }
 strum_macros = "0.28.0"
-symphonia = { version = "0.5.5", features = [
+symphonia = { version = "0.6.1", features = [
     "ogg",
     "isomp4",
     "aac",
     "vorbis",
+    "opt-simd",
 ], default-features = false }
 sys-locale = "0.3.2"
-time = "0.3.47"
+time = "0.3.55"
 walkdir = "2.5.0"
-webbrowser = { version = "1.2.0", features = ["disable-wsl", "hardened"] }
+webbrowser = { version = "1.2.4", features = ["disable-wsl", "hardened"] }
 
 [build-dependencies]
-embed-resource = "3.0.8"
+embed-resource = "3.0.12"
+
+[profile.release]
+lto = "fat"
+debug = false
+debug-assertions = false
+overflow-checks = false
+codegen-units = 1
+opt-level = 3
+strip = "symbols"
+
+[profile.release.build-override]
+debug = false
+debug-assertions = false
+overflow-checks = false
+codegen-units = 1
+opt-level = 3
+strip = "symbols"
