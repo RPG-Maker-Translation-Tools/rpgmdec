@@ -94,6 +94,15 @@ jobs:
           tar -xzf about.tar.gz -C "$(cygpath -u "$RUNNER_TEMP/about" 2>/dev/null || echo "$RUNNER_TEMP/about")" --strip-components=1
           echo "$RUNNER_TEMP/about" >> "$GITHUB_PATH"
 
+      - name: Static CRT for FLTK (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          # fltk-sys only sets CFLTK_MSVC_CRT_STATIC, FLTK's own FLTK_MSVC_RUNTIME_DLL defaults to ON and wins, which leaves
+          # its bundled C code on /MD. The cmake crate honors CMAKE_TOOLCHAIN_FILE, which can preset the option.
+          echo 'set(FLTK_MSVC_RUNTIME_DLL OFF CACHE BOOL "" FORCE)' > "$RUNNER_TEMP/static-crt.cmake"
+          echo "CMAKE_TOOLCHAIN_FILE=$(cygpath -m "$RUNNER_TEMP/static-crt.cmake")" >> "$GITHUB_ENV"
+
       - name: Build
         env:
           RUSTFLAGS: ${{ env.RUSTFLAGS_COMMON }} ${{ matrix.rustflags }}
