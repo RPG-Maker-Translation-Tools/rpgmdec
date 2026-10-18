@@ -1,31 +1,40 @@
 [package]
 name = "rpgmdec"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2024"
 rust-version = "1.88.0"
 license = "WTFPL"
+description = "GUI tool for decrypting and encrypting RPG Maker archives and assets, with audio and image previews."
+repository = "https://github.com/RPG-Maker-Translation-Tools/rpgmdec"
 
 [features]
+# gxhash needs AES-NI / Armv8 crypto; without it the maps fall back to rapidhash.
+default = ["gxhash", "mimalloc"]
+gxhash = ["dep:gxhash"]
+rapidhash = ["dep:rapidhash"]
 system-fltk = ["fltk/system-fltk"]
 system-png = ["fltk/system-libpng"]
 system-jpeg = ["fltk/system-libjpeg"]
 system-zlib = ["fltk/system-zlib"]
 static-msvcrt = ["fltk/static-msvcrt"]
+use-ninja = ["fltk/use-ninja"]
+mimalloc = ["dep:mimalloc"]
 
 [dependencies]
 cpal = { version = "0.18.2", features = ["realtime"] }
 dirs = "7.0.0"
 encoding_rs = "0.8.42"
-fltk = { version = "1.5.23", features = ["use-ninja", "single-threaded"] }
+fltk = "1.5.23"
 fltk-theme = "0.7.9"
 fontdue = { version = "0.9.4", features = ["parallel", "std"] }
-gxhash = { version = "3.5.0", features = ["deterministic"] }
+gxhash = { version = "3.5.0", features = ["deterministic"], optional = true }
 indexmap = "2.14.2"
+mimalloc = { version = "0.1.52", optional = true }
 phf = { version = "0.14.0", features = ["macros"] }
+rapidhash = { version = "4.5.1", optional = true }
 rayon = "1.12.0"
-rpgmad-lib = { version = "6.0.0" }
-rpgmasd = { package = "rpgm-asset-decrypter-lib", version = "4.0.0" }
-strum_macros = "0.28.0"
+rpgmad-lib = { version = "7.0.0" }
+rpgmasd = { package = "rpgm-asset-decrypter-lib", version = "5.0.0" }
 symphonia = { version = "0.6.1", features = [
     "ogg",
     "isomp4",
@@ -43,17 +52,10 @@ embed-resource = "3.0.12"
 
 [profile.release]
 lto = "fat"
-debug = false
-debug-assertions = false
-overflow-checks = false
 codegen-units = 1
-opt-level = 3
+panic = "abort"
 strip = "symbols"
 
 [profile.release.build-override]
-debug = false
-debug-assertions = false
-overflow-checks = false
 codegen-units = 1
 opt-level = 3
-strip = "symbols"
